@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Эволюция пиксельного мира - Игра</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #1a472a, #2c5e3a, #3d7a4d); color: #fff; min-height: 100vh; padding: 20px; overflow-x: hidden; }
+        .game-container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+        .header { text-align: center; padding: 20px; background: rgba(0,0,0,0.4); border-radius: 15px; border: 2px solid #8b5a2b; box-shadow: 0 0 20px rgba(139,90,43,0.4); position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #8b5a2b, #d2691e, #8b5a2b); }
+        .header h1 { font-size: 2.8rem; background: linear-gradient(to right, #d2691e, #8b5a2b); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 10px; text-shadow: 0 0 10px rgba(210,105,30,0.5); }
+        .version-badge { display: inline-block; background: linear-gradient(45deg, #8b5a2b, #d2691e); padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-left: 10px; }
+        .stats { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px; margin-top: 15px; }
+        .stat-item { background: rgba(0,20,10,0.7); padding: 10px 20px; border-radius: 10px; border: 1px solid #5d4037; min-width: 180px; position: relative; }
+        .new-resource { border-color: #8b5a2b !important; background: rgba(43,30,0,0.7) !important; animation: resourcePulse 2s infinite; }
+        @keyframes resourcePulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+        .new-badge { position: absolute; top: -8px; right: -8px; background: #8b5a2b; color: white; font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; }
+        .stat-value { font-size: 1.8rem; font-weight: bold; color: #d2691e; }
+        .main-content { display: flex; flex-wrap: wrap; gap: 20px; }
+        .world-container { flex: 1; min-width: 300px; background: rgba(0,0,0,0.5); border-radius: 15px; padding: 20px; border: 2px solid #5d4037; box-shadow: 0 0 25px rgba(93,64,55,0.3); position: relative; }
+        .weather-indicator { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 20px; font-size: 0.9rem; border: 1px solid #8b5a2b; }
+        .time-indicator { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 20px; font-size: 0.9rem; border: 1px solid #d2691e; }
+        .world-title { text-align: center; margin-bottom: 20px; font-size: 1.5rem; color: #d2691e; }
+        .world-canvas { width: 100%; height: 400px; background: rgba(30,50,30,0.9); border-radius: 10px; border: 1px solid #5d4037; position: relative; overflow: hidden; transition: background-color 5s ease; }
+        .world-canvas.night { background: rgba(10,20,30,0.9); }
+        .tree { position: absolute; width: 20px; height: 30px; background: linear-gradient(to bottom, #228b22, #006400); border-radius: 50% 50% 40% 40%; }
+        .stone { position: absolute; width: 15px; height: 15px; background: linear-gradient(45deg, #808080, #696969); border-radius: 3px; transform: rotate(45deg); }
+        .building { position: absolute; border: 2px solid #8b5a2b; background: rgba(139,90,43,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+        .upgrades-panel { flex: 1; min-width: 300px; background: rgba(0,0,0,0.5); border-radius: 15px; padding: 20px; border: 2px solid #d2691e; box-shadow: 0 0 25px rgba(210,105,30,0.3); }
+        .panel-title { text-align: center; margin-bottom: 20px; font-size: 1.5rem; color: #d2691e; }
+        .upgrades-list { display: flex; flex-direction: column; gap: 15px; max-height: 400px; overflow-y: auto; padding-right: 10px; }
+        .upgrade-item { background: rgba(43,30,0,0.7); padding: 15px; border-radius: 10px; border: 1px solid #8b5a2b; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; cursor: pointer; }
+        .upgrade-item:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(139,90,43,0.3); background: rgba(60,42,0,0.8); }
+        .upgrade-item.purchased { background: rgba(20,50,20,0.7); border-color: #2e8b57; }
+        .upgrade-cost { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
+        .cost-item { font-size: 0.9rem; color: #d2691e; }
+        .upgrade-item.purchased .cost-item { color: #2e8b57; }
+        .actions-panel { flex-basis: 100%; background: rgba(0,0,0,0.5); border-radius: 15px; padding: 20px; border: 2px solid #5d4037; box-shadow: 0 0 25px rgba(93,64,55,0.3); }
+        .actions-title { text-align: center; margin-bottom: 20px; font-size: 1.5rem; color: #5d4037; }
+        .actions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .action-btn { padding: 15px; background: rgba(43,30,0,0.7); border: 1px solid #8b5a2b; border-radius: 10px; color: white; font-size: 1.1rem; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .action-btn:hover { background: rgba(60,42,0,0.9); transform: translateY(-3px); box-shadow: 0 5px 15px rgba(139,90,43,0.3); }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .action-icon { font-size: 1.8rem; }
+        .buildings-panel { flex: 1; min-width: 300px; background: rgba(0,0,0,0.5); border-radius: 15px; padding: 20px; border: 2px solid #2e8b57; box-shadow: 0 0 25px rgba(46,139,87,0.3); }
+        .buildings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; margin-top: 15px; }
+        .building-item { background: rgba(20,40,20,0.7); padding: 15px; border-radius: 10px; border: 1px solid #2e8b57; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: all 0.3s; }
+        .building-item:hover { transform: translateY(-3px); background: rgba(30,60,30,0.8); }
+        .building-icon { font-size: 2rem; }
+        .building-count { font-size: 1.2rem; color: #d2691e; font-weight: bold; }
+        .achievements { position: fixed; top: 20px; right: 20px; width: 300px; background: rgba(0,0,0,0.8); border-radius: 10px; padding: 15px; border: 2px solid #8b5a2b; display: none; z-index: 1000; }
+        .achievement-unlocked { animation: achievementPop 0.5s ease-out; display: block !important; }
+        @keyframes achievementPop { 0% { transform: translateX(100%); opacity: 0; } 70% { transform: translateX(-10px); opacity: 1; } 100% { transform: translateX(0); opacity: 1; } }
+        .achievement-title { color: #d2691e; font-weight: bold; margin-bottom: 5px; }
+        .progress-bar { height: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; margin: 10px 0; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(to right, #8b5a2b, #d2691e); border-radius: 10px; width: 0%; transition: width 0.5s ease; }
+        .world-evolution { height: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; margin-top: 20px; overflow: hidden; }
+        .evolution-fill { height: 100%; background: linear-gradient(to right, #5d4037, #8b5a2b, #d2691e); border-radius: 10px; width: 0%; transition: width 1s ease; }
+        .notification { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 15px 25px; border-radius: 10px; border: 1px solid #8b5a2b; display: none; z-index: 1000; }
+        .notification.show { display: block; animation: fadeInOut 3s ease; }
+        @keyframes fadeInOut { 0% { opacity: 0; bottom: 0; } 20% { opacity: 1; bottom: 20px; } 80% { opacity: 1; bottom: 20px; } 100% { opacity: 0; bottom: 0; } }
+        .trade-btn { margin-top: 10px; padding: 8px 16px; background: rgba(210,105,30,0.8); border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 0.9rem; }
+        .trade-btn:hover { background: rgba(210,105,30,1); }
+        .how-to-play { margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 10px; border: 1px solid #5d4037; }
+        .how-to-play h3 { color: #d2691e; margin-bottom: 10px; }
+        .how-to-play ul { padding-left: 20px; line-height: 1.6; }
+        .github-link { text-align: center; margin-top: 20px; }
+        .github-link a { color: #d2691e; text-decoration: none; font-weight: bold; }
+        .github-link a:hover { text-decoration: underline; }
+        @media (max-width: 768px) { .main-content { flex-direction: column; } .achievements { position: static; width: 100%; margin-top: 20px; } .header h1 { font-size: 2rem; } .stat-item { min-width: 140px; } }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>ЭВОЛЮЦИЯ ПИКСЕЛЬНОГО МИРА <span class="version-badge">v1.1.0</span></h1>
+            <p>Собирайте ресурсы, стройте здания и развивайте свою цивилизацию!</p>
+            
+            <div class="stats">
+                <div class="stat-item"><div>ЭНЕРГИЯ</div><div class="stat-value" id="energy-value">100</div></div>
+                <div class="stat-item"><div>ТЕХНОЛОГИИ</div><div class="stat-value" id="tech-value">0</div></div>
+                <div class="stat-item new-resource"><div>ДРЕВЕСИНА</div><div class="stat-value" id="wood-value">20</div><div class="new-badge">НОВОЕ</div></div>
+                <div class="stat-item new-resource"><div>КАМЕНЬ</div><div class="stat-value" id="stone-value">10</div><div class="new-badge">НОВОЕ</div></div>
+                <div class="stat-item"><div>НАСЕЛЕНИЕ</div><div class="stat-value" id="population-value">10</div></div>
+            </div>
+            
+            <div class="world-evolution"><div class="evolution-fill" id="evolution-bar"></div></div>
+        </div>
+        
+        <div class="main-content">
+            <div class="world-container">
+                <div class="time-indicator" id="time-indicator">🌞 День</div>
+                <div class="weather-indicator" id="weather-indicator">☀️ Ясно</div>
+                <div class="world-title">ВАШ МИР</div>
+                <div class="world-canvas" id="world-canvas"></div>
+                <div class="progress-bar"><div class="progress-fill" id="world-progress"></div></div>
+                <div style="text-align: center; margin-top: 10px;">Прогресс развития: <span id="progress-percent">0%</span> | Эпоха: <span id="era-display">Каменный век</span></div>
+                <button class="trade-btn" onclick="openTrade()">Обменять ресурсы (1:1)</button>
+            </div>
+            
+            <div class="upgrades-panel">
+                <div class="panel-title">УЛУЧШЕНИЯ</div>
+                <div class="upgrades-list" id="upgrades-list"></div>
+            </div>
+            
+            <div class="buildings-panel">
+                <div class="panel-title">ПОСТРОЙКИ</div>
+                <div class="buildings-grid" id="buildings-grid"></div>
+            </div>
+            
+            <div class="actions-panel">
+                <div class="actions-title">ДЕЙСТВИЯ</div>
+                <div class="actions-grid" id="actions-grid"></div>
+            </div>
+        </div>
+        
+        <div class="how-to-play">
+            <h3>📚 Как играть:</h3>
+            <ul>
+                <li><strong>Собирайте ресурсы</strong> - используйте кнопки действий для получения энергии, древесины и камня</li>
+                <li><strong>Покупайте улучшения</strong> - тратьте ресурсы на улучшения для увеличения эффективности</li>
+                <li><strong>Стройте здания</strong> - здания приносят ресурсы автоматически каждый ход</li>
+                <li><strong>Следите за временем</strong> - ночью продуктивность снижается на 30%</li>
+                <li><strong>Развивайтесь</strong> - набирайте прогресс для перехода в новые эпохи</li>
+            </ul>
+        </div>
+        
+        <div class="github-link">
+            <p>Игра доступна на GitHub: <a href="https://github.com/ваш-логин/pixel-world-game" target="_blank">https://github.com/ваш-логин/pixel-world-game</a></p>
+        </div>
+    </div>
+    
+    <div class="achievements" id="achievements-panel">
+        <div class="achievement-title" id="achievement-title">ДОСТИЖЕНИЕ РАЗБЛОКИРОВАНО!</div>
+        <div id="achievement-desc">Вы достигли нового уровня развития!</div>
+    </div>
+    
+    <div class="notification" id="notification">Ресурсы добавлены!</div>
+
+    <script>
+        const gameState = {
+            energy: 100, technology: 0, wood: 20, stone: 10, population: 10, era: 0,
+            eraNames: ["Каменный век", "Бронзовый век", "Железный век", "Средневековье", "Ренессанс", "Индустриальная эпоха", "Информационная эра", "Будущее"],
+            progress: 0, upgrades: [], buildings: { house: 0, sawmill: 0, quarry: 0, library: 0, workshop: 0 },
+            achievements: [], worldElements: [], timeOfDay: 12, isDay: true, weather: 'clear'
+        };
+
+        const allUpgrades = [
+            { id: 1, name: "Каменные инструменты", description: "+50% к добыче камня", cost: { wood: 20, stone: 30 }, type: "stone", multiplier: 1.5, icon: "⛏️" },
+            { id: 2, name: "Лесопилка", description: "Увеличивает добычу древесины", cost: { wood: 50, stone: 20 }, type: "wood", add: 5, icon: "🌲" },
+            { id: 3, name: "Письменность", description: "Открывает технологии", cost: { wood: 30, stone: 40 }, type: "tech", add: 2, icon: "📜" },
+            { id: 4, name: "Металлургия", description: "Улучшает все инструменты", cost: { wood: 100, stone: 150 }, type: "multiply", multiplier: 1.3, icon: "🔥" },
+            { id: 5, name: "Сельское хозяйство", description: "+10 к населению", cost: { wood: 80, stone: 60 }, type: "population", add: 10, icon: "🌾" },
+            { id: 6, name: "Торговля", description: "Улучшает обмен ресурсов", cost: { wood: 120, stone: 100 }, type: "trade", multiplier: 1.5, icon: "💰" },
+            { id: 7, name: "Архитектура", description: "Уменьшает стоимость построек", cost: { wood: 200, stone: 250 }, type: "buildings", multiplier: 0.8, icon: "🏛️" },
+            { id: 8, name: "Образование", description: "+100% к технологиям", cost: { wood: 150, stone: 200 }, type: "tech", multiplier: 2, icon: "🎓" }
+        ];
+
+        const allActions = [
+            { id: 1, name: "Собрать ягоды", description: "Получить энергию", reward: 15, type: "energy", icon: "🍓", cost: {} },
+            { id: 2, name: "Рубить деревья", description: "Получить древесину", reward: 8, type: "wood", icon: "🪓", cost: { energy: 5 } },
+            { id: 3, name: "Добывать камень", description: "Получить камень", reward: 5, type: "stone", icon: "🗿", cost: { energy: 8 } },
+            { id: 4, name: "Исследовать", description: "Получить технологии", reward: 10, type: "tech", icon: "🔬", cost: { energy: 15 } },
+            { id: 5, name: "Охотиться", description: "Прокормить население", reward: 5, type: "population", icon: "🏹", cost: { energy: 20 } },
+            { id: 6, name: "Строить", description: "Увеличить прогресс", reward: 3, type: "progress", icon: "🏗️", cost: { wood: 10, stone: 5 } }
+        ];
+
+        const allBuildings = [
+            { id: "house", name: "Жилище", description: "+5 к населению", cost: { wood: 30, stone: 20 }, effect: { population: 5 }, icon: "🏠" },
+            { id: "sawmill", name: "Лесопилка", description: "+2 древесины/ход", cost: { wood: 50, stone: 30 }, effect: { woodPerTurn: 2 }, icon: "🌲" },
+            { id: "quarry", name: "Каменоломня", description: "+1 камня/ход", cost: { wood: 40, stone: 60 }, effect: { stonePerTurn: 1 }, icon: "⛰️" },
+            { id: "library", name: "Библиотека", description: "+2 технологии/ход", cost: { wood: 80, stone: 40 }, effect: { techPerTurn: 2 }, icon: "📚" },
+            { id: "workshop", name: "Мастерская", description: "Ускоряет прогресс", cost: { wood: 100, stone: 80 }, effect: { progressBonus: 10 }, icon: "⚒️" }
+        ];
+
+        const allAchievements = [
+            { id: 1, name: "Первый лесоруб", description: "Соберите 100 древесины", condition: () => totalWoodCollected >= 100, unlocked: false },
+            { id: 2, name: "Каменотёс", description: "Соберите 50 камня", condition: () => totalStoneCollected >= 50, unlocked: false },
+            { id: 3, name: "Строитель", description: "Постройте 5 зданий", condition: () => Object.values(gameState.buildings).reduce((a, b) => a + b) >= 5, unlocked: false },
+            { id: 4, name: "Новая эра", description: "Достигните бронзового века", condition: () => gameState.era >= 1, unlocked: false }
+        ];
+
+        let totalWoodCollected = 20, totalStoneCollected = 10;
+
+        function initGame() {
+            updateUI(); createWorld(); renderUpgrades(); renderActions(); renderBuildings();
+            setInterval(gameTick, 3000); setInterval(updateTime, 30000); setInterval(animateWorld, 100);
+            setTimeout(() => showNotification("Добро пожаловать в игру! Собирайте ресурсы и развивайте свою цивилизацию!"), 1000);
+        }
+
+        function createWorld() {
+            const canvas = document.getElementById('world-canvas');
+            gameState.worldElements = []; canvas.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                const tree = document.createElement('div'); tree.className = 'tree';
+                tree.style.left = `${10 + i * 10}%`; tree.style.top = `${30 + Math.random() * 40}%`;
+                canvas.appendChild(tree); gameState.worldElements.push(tree);
+            }
+            for (let i = 0; i < 6; i++) {
+                const stone = document.createElement('div'); stone.className = 'stone';
+                stone.style.left = `${15 + i * 12}%`; stone.style.top = `${60 + Math.random() * 20}%`;
+                canvas.appendChild(stone); gameState.worldElements.push(stone);
+            }
+            renderExistingBuildings(); updateWorldAppearance();
+        }
+
+        function renderExistingBuildings() {
+            const canvas = document.getElementById('world-canvas');
+            const buildingPositions = [
+                { left: '25%', top: '20%' }, { left: '40%', top: '25%' }, { left: '55%', top: '30%' }, { left: '70%', top: '20%' }, { left: '85%', top: '25%' }
+            ];
+            document.querySelectorAll('.building').forEach(el => el.remove());
+            let buildingIndex = 0;
+            for (const [buildingId, count] of Object.entries(gameState.buildings)) {
+                if (count > 0) {
+                    const buildingInfo = allBuildings.find(b => b.id === buildingId);
+                    if (buildingInfo && buildingPositions[buildingIndex]) {
+                        const building = document.createElement('div'); building.className = 'building';
+                        building.textContent = buildingInfo.icon; building.style.left = buildingPositions[buildingIndex].left;
+                        building.style.top = buildingPositions[buildingIndex].top; building.style.width = '30px'; building.style.height = '30px';
+                        building.style.borderRadius = '5px'; building.title = `${buildingInfo.name} x${count}`;
+                        canvas.appendChild(building); gameState.worldElements.push(building); buildingIndex++;
+                    }
+                }
+            }
+        }
+
+        function updateWorldAppearance() {
+            const canvas = document.getElementById('world-canvas'), timeIndicator = document.getElementById('time-indicator');
+            gameState.isDay = gameState.timeOfDay >= 6 && gameState.timeOfDay < 20;
+            if (gameState.isDay) { canvas.classList.remove('night'); timeIndicator.textContent = `🌞 День (${gameState.timeOfDay}:00)`; }
+            else { canvas.classList.add('night'); timeIndicator.textContent = `🌙 Ночь (${gameState.timeOfDay}:00)`; }
+            document.getElementById('weather-indicator').textContent = gameState.weather === 'clear' ? '☀️ Ясно' : gameState.weather === 'rain' ? '🌧️ Дождь' : '☁️ Облачно';
+        }
+
+        function gameTick() {
+            let generatedResources = [];
+            if (gameState.buildings.sawmill > 0) { const woodGen = gameState.buildings.sawmill * 2; gameState.wood += woodGen; generatedResources.push(`🌲 +${woodGen}`); }
+            if (gameState.buildings.quarry > 0) { const stoneGen = gameState.buildings.quarry; gameState.stone += stoneGen; generatedResources.push(`🗿 +${stoneGen}`); }
+            if (gameState.buildings.library > 0) { const techGen = gameState.buildings.library * 2; gameState.technology += techGen; generatedResources.push(`📚 +${techGen}`); }
+            if (generatedResources.length > 0 && Math.random() > 0.5) showNotification(`Автоматически: ${generatedResources.join(', ')}`);
+            const populationLimit = 10 + (gameState.buildings.house * 5);
+            if (gameState.population > populationLimit) {
+                const penalty = Math.floor((gameState.population - populationLimit) * 0.1);
+                gameState.energy = Math.max(0, gameState.energy - penalty);
+                if (penalty > 0 && Math.random() > 0.7) showNotification(`Перенаселение! -${penalty} энергии`);
+            }
+            updateUI();
+        }
+
+        function updateTime() {
+            gameState.timeOfDay = (gameState.timeOfDay + 1) % 24;
+            if (Math.random() < 0.2) {
+                const weathers = ['clear', 'cloudy', 'rain'];
+                gameState.weather = weathers[Math.floor(Math.random() * weathers.length)];
+                if (gameState.weather === 'rain' && Math.random() > 0.5) showNotification("🌧️ Начался дождь!");
+            }
+            const wasDay = gameState.isDay; gameState.isDay = gameState.timeOfDay >= 6 && gameState.timeOfDay < 20;
+            if (wasDay && !gameState.isDay) showNotification("🌙 Наступила ночь: продуктивность снижена на 30%");
+            else if (!wasDay && gameState.isDay) showNotification("🌞 Наступило утро: продуктивность восстановлена!");
+            updateWorldAppearance(); updateUI();
+        }
+
+        function animateWorld() {
+            gameState.worldElements.forEach(element => { if (Math.random() < 0.01) element.style.opacity = Math.random() * 0.5 + 0.5; });
+        }
+
+        function updateUI() {
+            document.getElementById('energy-value').textContent = Math.floor(gameState.energy);
+            document.getElementById('tech-value').textContent = Math.floor(gameState.technology);
+            document.getElementById('wood-value').textContent = Math.floor(gameState.wood);
+            document.getElementById('stone-value').textContent = Math.floor(gameState.stone);
+            document.getElementById('population-value').textContent = Math.floor(gameState.population);
+            document.getElementById('era-display').textContent = gameState.eraNames[gameState.era];
+            const progressPercent = Math.min(100, gameState.progress);
+            document.getElementById('world-progress').style.width = `${progressPercent}%`;
+            document.getElementById('progress-percent').textContent = `${Math.floor(progressPercent)}%`;
+            const eraProgress = (gameState.era / (gameState.eraNames.length - 1)) * 100;
+            document.getElementById('evolution-bar').style.width = `${eraProgress}%`;
+            checkAchievements();
+        }
+
+        function renderUpgrades() {
+            const container = document.getElementById('upgrades-list'); container.innerHTML = '';
+            allUpgrades.forEach(upgrade => {
+                const isPurchased = gameState.upgrades.includes(upgrade.id), canAfford = canAffordUpgrade(upgrade);
+                const upgradeElement = document.createElement('div'); upgradeElement.className = `upgrade-item ${isPurchased ? 'purchased' : ''}`;
+                let costHTML = '';
+                if (upgrade.cost.wood) costHTML += `<div class="cost-item">🌲 ${upgrade.cost.wood}</div>`;
+                if (upgrade.cost.stone) costHTML += `<div class="cost-item">🗿 ${upgrade.cost.stone}</div>`;
+                upgradeElement.innerHTML = `
+                    <div><div style="font-weight: bold; margin-bottom: 5px;">${upgrade.icon} ${upgrade.name}</div>
+                    <div style="font-size: 0.9rem; opacity: 0.8;">${upgrade.description}</div></div>
+                    <div class="upgrade-cost">${isPurchased ? '<div class="cost-item">КУПЛЕНО</div>' : costHTML}</div>`;
+                if (!isPurchased && canAfford) upgradeElement.addEventListener('click', () => purchaseUpgrade(upgrade));
+                container.appendChild(upgradeElement);
+            });
+        }
+
+        function canAffordUpgrade(upgrade) {
+            for (const [resource, cost] of Object.entries(upgrade.cost)) if (gameState[resource] < cost) return false;
+            return true;
+        }
+
+        function purchaseUpgrade(upgrade) {
+            if (!canAffordUpgrade(upgrade) || gameState.upgrades.includes(upgrade.id)) return;
+            for (const [resource, cost] of Object.entries(upgrade.cost)) gameState[resource] -= cost;
+            gameState.upgrades.push(upgrade.id); showNotification(`Улучшение "${upgrade.name}" куплено!`);
+            gameState.progress += 8; checkEraProgression(); updateUI(); renderUpgrades(); renderActions();
+        }
+
+        function renderActions() {
+            const container = document.getElementById('actions-grid'); container.innerHTML = '';
+            allActions.forEach(action => {
+                const canAfford = canAffordAction(action), isNightPenalty = !gameState.isDay;
+                const actionElement = document.createElement('button'); actionElement.className = 'action-btn'; actionElement.disabled = !canAfford;
+                let reward = action.reward; if (isNightPenalty && action.type !== 'progress') reward = Math.floor(reward * 0.7);
+                if (action.type === 'wood' && gameState.upgrades.includes(2)) reward += 5;
+                if (action.type === 'stone' && gameState.upgrades.includes(1)) reward = Math.floor(reward * 1.5);
+                if (action.type === 'tech' && gameState.upgrades.includes(8)) reward *= 2;
+                if (gameState.upgrades.includes(4)) reward = Math.floor(reward * 1.3);
+                actionElement.innerHTML = `
+                    <div class="action-icon">${action.icon}</div><div style="font-weight: bold;">${action.name}</div>
+                    <div style="font-size: 0.8rem; opacity: 0.8;">${action.description}</div>
+                    <div style="font-size: 0.9rem; color: #d2691e; margin-top: 5px;">+${reward} ${getResourceName(action.type)}
+                    ${isNightPenalty && action.type !== 'progress' ? '<div style="font-size:0.7rem;color:#ff6b6b;">(ночь -30%)</div>' : ''}</div>`;
+                if (canAfford) actionElement.addEventListener('click', () => performAction(action));
+                container.appendChild(actionElement);
+            });
+        }
+
+        function canAffordAction(action) {
+            for (const [resource, cost] of Object.entries(action.cost)) if (gameState[resource] < cost) return false;
+            return true;
+        }
+
+        function performAction(action) {
+            for (const [resource, cost] of Object.entries(action.cost)) { if (gameState[resource] < cost) return; gameState[resource] -= cost; }
+            let reward = action.reward; if (!gameState.isDay && action.type !== 'progress') reward = Math.floor(reward * 0.7);
+            switch(action.type) {
+                case 'wood': if (gameState.upgrades.includes(2)) reward += 5; totalWoodCollected += reward; break;
+                case 'stone': if (gameState.upgrades.includes(1)) reward = Math.floor(reward * 1.5); totalStoneCollected += reward; break;
+                case 'tech': if (gameState.upgrades.includes(8)) reward *= 2; break;
+            }
+            if (gameState.upgrades.includes(4)) reward = Math.floor(reward * 1.3);
+            gameState[action.type] += reward; if (action.type !== 'progress') gameState.progress += 1;
+            checkEraProgression(); showNotification(`+${reward} ${getResourceName(action.type)}`); updateUI(); renderActions();
+        }
+
+        function renderBuildings() {
+            const container = document.getElementById('buildings-grid'); container.innerHTML = '';
+            allBuildings.forEach(building => {
+                const count = gameState.buildings[building.id] || 0, canAfford = canAffordBuilding(building);
+                const buildingElement = document.createElement('div'); buildingElement.className = 'building-item';
+                buildingElement.innerHTML = `
+                    <div class="building-icon">${building.icon}</div><div style="font-weight: bold; text-align: center;">${building.name}</div>
+                    <div style="font-size: 0.8rem; text-align: center; opacity: 0.8;">${building.description}</div>
+                    <div class="building-count">${count}</div><div style="font-size: 0.7rem; text-align: center;">
+                    ${building.cost.wood ? `🌲${building.cost.wood} ` : ''}${building.cost.stone ? `🗿${building.cost.stone}` : ''}</div>`;
+                if (canAfford) buildingElement.addEventListener('click', () => constructBuilding(building));
+                container.appendChild(buildingElement);
+            });
+        }
+
+        function canAffordBuilding(building) {
+            for (const [resource, cost] of Object.entries(building.cost)) if (gameState[resource] < cost) return false;
+            return true;
+        }
+
+        function constructBuilding(building) {
+            if (!canAffordBuilding(building)) return;
+            for (const [resource, cost] of Object.entries(building.cost)) gameState[resource] -= cost;
+            gameState.buildings[building.id] = (gameState.buildings[building.id] || 0) + 1;
+            if (building.effect.population) gameState.population += building.effect.population;
+            showNotification(`Построено: ${building.name}!`); gameState.progress += 5; checkEraProgression();
+            renderExistingBuildings(); updateUI(); renderBuildings(); renderActions();
+        }
+
+        function checkEraProgression() {
+            if (gameState.progress >= 100 && gameState.era < gameState.eraNames.length - 1) {
+                gameState.era++; gameState.progress = 0;
+                showAchievement(`Новая эра: ${gameState.eraNames[gameState.era]}!`);
+                showNotification(`🎉 Поздравляем! Вы достигли ${gameState.eraNames[gameState.era]}!`);
+            }
+        }
+
+        function openTrade() {
+            const tradeRate = gameState.upgrades.includes(6) ? 1.5 : 1;
+            const input = prompt(`Обменять ресурсы по курсу 1:1${tradeRate > 1 ? ' (Улучшение торговли: +50%)' : ''}\n\nДоступные ресурсы: древесина, камень, энергия\n\nВведите в формате: [ресурс1] [ресурс2] [количество]\nПример: древесина камень 10`);
+            if (!input) return;
+            const parts = input.toLowerCase().split(' ');
+            if (parts.length !== 3) { alert("Неверный формат! Используйте: [ресурс1] [ресурс2] [количество]"); return; }
+            const [resource1, resource2, amountStr] = parts, amount = parseInt(amountStr);
+            const validResources = ['древесина', 'дерево', 'wood', 'камень', 'stone', 'энергия', 'energy'];
+            if (!validResources.includes(resource1) || !validResources.includes(resource2)) {
+                alert("Неверное название ресурса! Используйте: древесина, камень или энергия"); return;
+            }
+            const normResource1 = resource1.includes('древ') || resource1 === 'wood' ? 'wood' : resource1.includes('кам') || resource1 === 'stone' ? 'stone' : 'energy';
+            const normResource2 = resource2.includes('древ') || resource2 === 'wood' ? 'wood' : resource2.includes('кам') || resource2 === 'stone' ? 'stone' : 'energy';
+            if (normResource1 === normResource2) { alert("Нельзя обменять ресурс на тот же самый!"); return; }
+            if (isNaN(amount) || amount <= 0) { alert("Неверное количество! Введите положительное число."); return; }
+            if (gameState[normResource1] >= amount) {
+                gameState[normResource1] -= amount; gameState[normResource2] += Math.floor(amount * tradeRate);
+                showNotification(`Обмен: ${amount} ${getResourceName(normResource1)} → ${Math.floor(amount * tradeRate)} ${getResourceName(normResource2)}`);
+                updateUI();
+            } else alert("Недостаточно ресурсов!");
+        }
+
+        function checkAchievements() {
+            allAchievements.forEach(achievement => {
+                if (!achievement.unlocked && achievement.condition()) {
+                    achievement.unlocked = true; showAchievement(achievement.name, achievement.description);
+                }
+            });
+        }
+
+        function showAchievement(title, description = '') {
+            const panel = document.getElementById('achievements-panel');
+            document.getElementById('achievement-title').textContent = title;
+            document.getElementById('achievement-desc').textContent = description || 'Вы достигли нового уровня развития!';
+            panel.classList.add('achievement-unlocked');
+            setTimeout(() => panel.classList.remove('achievement-unlocked'), 5000);
+        }
+
+        function showNotification(text) {
+            const notification = document.getElementById('notification');
+            notification.textContent = text; notification.classList.add('show');
+            setTimeout(() => notification.classList.remove('show'), 3000);
+        }
+
+        function getResourceName(type) {
+            switch(type) {
+                case 'energy': return 'энергии'; case 'tech': return 'технологий'; case 'wood': return 'древесины';
+                case 'stone': return 'камня'; case 'population': return 'населения'; case 'progress': return 'прогресса';
+                default: return 'ресурсов';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
